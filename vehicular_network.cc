@@ -24,7 +24,7 @@ void SDNController::setPort(uint32_t port) {
         m_port = port;
 }
 
-void SDNController::HandshakeSuccessful(Ptr<const RemoteSwitch> swtch) {
+void SDNController::HandlePacketIn(Ptr<const RemoteSwitch> swtch) {
 
     uint64_t dpId = swtch->GetDpId();
 
@@ -33,7 +33,7 @@ void SDNController::HandshakeSuccessful(Ptr<const RemoteSwitch> swtch) {
     command << "flow-mod cmd=add,table=0,prio=1 "
             << "in_port=0 "
             << "actions=output:" << m_port;
-    std::string command2 = "flow-mod cmd=add,table=0,prio=1 in_port=1 write:output=1";
+    std::string command2 = "flow-mod cmd=add,table=0,prio=1000 in_port=1 write:output=1";
     // Execute the flow rule command
     DpctlExecute(dpId, command2);
 
