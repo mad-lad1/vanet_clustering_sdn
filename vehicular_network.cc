@@ -12,9 +12,9 @@ class SDNController: public OFSwitch13Controller  {
         void setPort(uint32_t port);
     protected:
     void HandshakeSuccessful(Ptr<const RemoteSwitch> swtch) override;
-    // ofl_err HandlePacketIn(struct ofl_msg_packet_in* msg,
-    //                        Ptr<const RemoteSwitch> swtch,
-    //                        uint32_t xid) override;
+     ofl_err HandlePacketIn(struct ofl_msg_packet_in* msg,
+                            Ptr<const RemoteSwitch> swtch,
+                            uint32_t xid) override;
     private:
     uint32_t m_port = 1;
 };  
@@ -24,20 +24,47 @@ void SDNController::setPort(uint32_t port) {
         m_port = port;
 }
 
-void SDNController::HandlePacketIn(Ptr<const RemoteSwitch> swtch) {
+void SDNController::HandshakeSuccessful(Ptr<const RemoteSwitch> swtch) {
 
     uint64_t dpId = swtch->GetDpId();
 
     // Create the flow rule command
-    std::ostringstream command;
-    command << "flow-mod cmd=add,table=0,prio=1 "
-            << "in_port=0 "
-            << "actions=output:" << m_port;
-    std::string command2 = "flow-mod cmd=add,table=0,prio=1000 in_port=1 write:output=1";
+    std::string command = "flow-mod cmd=add,table=0,prio=1000 in_port=1 write:output=1";
+
     // Execute the flow rule command
     DpctlExecute(dpId, command2);
 
 };
+
+ofl_err SDNController::HandlePacketIn(struct ofl_msg_packet_in* msg,
+                                      Ptr<const RemoteSwitch> swtch,
+                                      uint32_t xid) {
+
+    uint64_t dpId = swtch->GetDpId();
+    uint32_t inPort = msg->in_port;
+
+    // Extract the packet data from the message
+    uint8_t* packetData = msg->data;
+    uint32_t packetLength = msg->data_length;
+    uint32_t etherType = GetPacketType(packetData, packetLength);
+
+    if (etherType == ETHERTYPE_IPv4) {
+        // Install a flow rule to prioritize the second switch
+        if (dpId == 2) {
+            std::ostringstream command;
+            command << "flow-mod cmd=add,table=0,prio=1000 "
+                    << "in_port=" << inPort << " "
+                    << "actions=output:" << m_port;
+            DpctlExecute(dpId, command.str());
+        }
+    }
+
+    // Send the packet out the appropriate port
+    SendPacket(swtch, msg->data, msg->data_length, m_port, inPort);
+
+    return ofl_err::OFPET_BAD_REQUEST;
+}
+
 
 
 
